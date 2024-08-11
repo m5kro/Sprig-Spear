@@ -14,6 +14,7 @@ ECTO-1A for the [AppleJuice](https://github.com/ECTO-1A/AppleJuice) Code
 5. Bluetooth L2CAP ping
 6. Bluetooth Fake device (maybe)
 7. Pn532 NFC addon (Very Unlikely)
+8. Rewrite/Reorganize code
 # Disclaimers
 1. I'm not responsible for what you do so don't do anything stupid. (I know some of you will)
 2. AppleJuice attack has been patched by Apple. The attack is also unreliable due to possible ETIMEOUT Error.
