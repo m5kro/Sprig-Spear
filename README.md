@@ -1,4 +1,5 @@
 # Sprig-Spear
+![Sprig Dino Spear Edition](https://raw.githubusercontent.com/m5kro/Sprig-Spear/main/SPRIGDINO-Spear-Edition.png) <br>
 Spear is a custom firmware built using micropython for the Hack Club Sprig console used for cybersecurity pentesting. Scroll down for instructions.
 # Credits
 Hack Club team for the [Sprig](https://github.com/hackclub/sprig/) :D <br>
