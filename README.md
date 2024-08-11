@@ -1,8 +1,8 @@
 # Sprig-Spear
 Spear is a custom firmware built using micropython for the Hack Club Sprig console used for cybersecurity pentesting. Scroll down for instructions.
 # Credits
-Hack Club team for the Sprig :D <br>
-ECTO-1A for the AppleJuice Code
+Hack Club team for the [Sprig](https://github.com/hackclub/sprig/) :D <br>
+ECTO-1A for the [AppleJuice](https://github.com/ECTO-1A/AppleJuice) Code
 # Current Features
 1. Bluetooth AppleJuice Attack (Read Disclaimer)
 # Upcoming Features (No particular order)
