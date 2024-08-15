@@ -18,15 +18,7 @@ button_right = [Pin(15, Pin.IN, Pin.PULL_UP), Pin(8, Pin.IN, Pin.PULL_UP)]
 # Menu Configuration
 main_menu = ["WiFi", "Bluetooth"]
 bluetooth_submenu = ["AppleJuice"]
-payload_names = [
-    "Airpods", "Airpods Pro", "Airpods Max", "Airpods Gen 2", "Airpods Gen 3",
-    "Airpods Pro Gen 2", "PowerBeats", "PowerBeats Pro", "Beats Solo Pro", 
-    "Beats Studio Buds", "Beats Flex", "BeatsX", "Beats Solo3", "Beats Studio3",
-    "Beats Studio Pro", "Beats Fit Pro", "Beats Studio Buds+", "AppleTV Setup",
-    "AppleTV Pair", "AppleTV New User", "AppleTV AppleID Setup", "AppleTV Wireless Audio Sync",
-    "AppleTV Homekit Setup", "AppleTV Keyboard", "AppleTV 'Connecting to Network'",
-    "Homepod Setup", "Setup New Phone", "Transfer Number to New Phone", "TV Color Balance"
-]
+payload_names = applejuice.payload_names
 
 # State Variables
 selected_index = 0

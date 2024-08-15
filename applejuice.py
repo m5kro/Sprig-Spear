@@ -3,6 +3,16 @@ import time
 
 thread_running = True # Thread manageer
 
+payload_names = [
+    "Airpods", "Airpods Pro", "Airpods Max", "Airpods Gen 2", "Airpods Gen 3",
+    "Airpods Pro Gen 2", "PowerBeats", "PowerBeats Pro", "Beats Solo Pro", 
+    "Beats Studio Buds", "Beats Flex", "BeatsX", "Beats Solo3", "Beats Studio3",
+    "Beats Studio Pro", "Beats Fit Pro", "Beats Studio Buds+", "AppleTV Setup",
+    "AppleTV Pair", "AppleTV New User", "AppleTV AppleID Setup", "AppleTV Wireless Audio Sync",
+    "AppleTV Homekit Setup", "AppleTV Keyboard", "AppleTV 'Connecting to Network'",
+    "Homepod Setup", "Setup New Phone", "Transfer Number to New Phone", "TV Color Balance"
+]
+
 def stop_advertising():
     # Stop BLE advertising
     global thread_running
