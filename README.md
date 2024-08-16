@@ -21,6 +21,6 @@ ECTO-1A for the [AppleJuice](https://github.com/ECTO-1A/AppleJuice) Code
 # Setup Instructions
 1. Download [Micropython](https://micropython.org/download/RPI_PICO_W/)
 2. Flash to the Pico W (Newer versions of the Sprig come with a Pico W)
-3. Use [Thonny](https://thonny.org/) or [MicroPico](https://github.com/paulober/MicroPico) to send main.py and applejuice.py to the Pico W
+3. Use [Thonny](https://thonny.org/) or [MicroPico](https://github.com/paulober/MicroPico) to send main.py, ST7735.py, and applejuice.py to the Pico W
 4. Reboot the Pico W
 5. Use buttons to navigate. Up/Down to select, Right to enter, Left to go back
