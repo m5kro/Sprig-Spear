@@ -4,6 +4,7 @@ import _thread
 import applejuice
 import ST7735  # Import the display module
 import framebuf
+from keystrokes import test_payload
 
 # Color Definitions
 BLACK = ST7735.BLACK
@@ -16,8 +17,10 @@ button_left = [Pin(13, Pin.IN, Pin.PULL_UP), Pin(6, Pin.IN, Pin.PULL_UP)]
 button_right = [Pin(15, Pin.IN, Pin.PULL_UP), Pin(8, Pin.IN, Pin.PULL_UP)]
 
 # Menu Configuration
-main_menu = ["WiFi", "Bluetooth"]
+main_menu = ["WiFi", "Bluetooth", "USB"]
 bluetooth_submenu = ["AppleJuice"]
+usb_submenu = ["Rubber Ducky"]
+rubber_ducky_submenu = ["test-payload"]
 payload_names = applejuice.payload_names
 
 # State Variables
@@ -229,13 +232,20 @@ def check_buttons():
         button_pressed = True
         time.sleep(0.2)  # Debounce delay
     elif any(not btn.value() for btn in button_right):
-        if current_menu == main_menu and current_menu[selected_index] == "Bluetooth":
-            enter_menu(bluetooth_submenu)
+        if current_menu == main_menu:
+            if current_menu[selected_index] == "Bluetooth":
+                enter_menu(bluetooth_submenu)
+            elif current_menu[selected_index] == "USB":
+                enter_menu(usb_submenu)
         elif current_menu == bluetooth_submenu and current_menu[selected_index] == "AppleJuice":
             enter_menu(payload_names)
         elif current_menu == payload_names:
             payload_selected_index = selected_index
             handle_interval_menu()  # Move to the interval menu
+        elif current_menu == usb_submenu and current_menu[selected_index] == "Rubber Ducky":
+            enter_menu(rubber_ducky_submenu)
+        elif current_menu == rubber_ducky_submenu and current_menu[selected_index] == "test-payload":
+            test_payload()  # Trigger the typing of "test" :)
         button_pressed = True
         time.sleep(0.2)  # Debounce delay
     elif any(not btn.value() for btn in button_left) and previous_menu_stack:
