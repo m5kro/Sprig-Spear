@@ -4,7 +4,8 @@ import _thread
 import applejuice
 import ST7735  # Import the display module
 import framebuf
-from keystrokes import test_payload
+from keystrokes import interpret_ducky_script # For executing Rubber Ducky scripts
+import os
 
 # Color Definitions
 BLACK = ST7735.BLACK
@@ -20,7 +21,7 @@ button_right = [Pin(15, Pin.IN, Pin.PULL_UP), Pin(8, Pin.IN, Pin.PULL_UP)]
 main_menu = ["WiFi", "Bluetooth", "USB"]
 bluetooth_submenu = ["AppleJuice"]
 usb_submenu = ["Rubber Ducky"]
-rubber_ducky_submenu = ["test-payload"]
+rubber_ducky_submenu = []  # This will be populated with .ducky files on startup
 payload_names = applejuice.payload_names
 
 # State Variables
@@ -43,6 +44,13 @@ pwm_power_light = PWM(Pin(power_light_pin))
 pwm_power_light.freq(1000)
 pwm_power_light.duty_u16(65535 // 8)  # Dim the light
 
+# Load .ducky scripts at startup
+def load_ducky_scripts():
+    global rubber_ducky_submenu
+    ducky_files = [f[:-6] for f in os.listdir() if f.endswith('.ducky')]
+    rubber_ducky_submenu = ducky_files  # Update the submenu with the list of files
+
+# Display the menu on the screen
 def display_menu(menu):
     global scroll_offset, last_scroll_time
     # Dynamically allocate framebuffer
@@ -81,6 +89,7 @@ def display_menu(menu):
     ST7735.update_display(fb)
     del fb  # Free framebuffer memory
 
+# Display the Interval menu
 def display_interval_menu():
     global interval_value
     # Dynamically allocate framebuffer
@@ -100,6 +109,7 @@ def display_interval_menu():
     ST7735.update_display(fb)
     del fb  # Free framebuffer memory
 
+# Display the Loop Interval menu
 def display_loop_interval_menu():
     global loop_interval_value
     # Dynamically allocate framebuffer
@@ -119,6 +129,7 @@ def display_loop_interval_menu():
     ST7735.update_display(fb)
     del fb  # Free framebuffer memory
 
+# Display "Attack Running!" message
 def display_attack_running():
     # Dynamically allocate framebuffer
     width = 160
@@ -132,6 +143,7 @@ def display_attack_running():
     ST7735.update_display(fb)
     del fb  # Free framebuffer memory
 
+# Enter a new menu
 def enter_menu(new_menu):
     global current_menu, selected_index, display_start_index, previous_menu_stack
     previous_menu_stack.append((current_menu, selected_index, display_start_index))
@@ -140,11 +152,13 @@ def enter_menu(new_menu):
     display_start_index = 0
     display_menu(current_menu)
 
+# Exit the current menu
 def exit_menu():
     global current_menu, selected_index, display_start_index, previous_menu_stack
     current_menu, selected_index, display_start_index = previous_menu_stack.pop()
     display_menu(current_menu)
 
+# Handle Interval menu interactions
 def handle_interval_menu():
     global interval_value
 
@@ -169,6 +183,7 @@ def handle_interval_menu():
             time.sleep(0.2)  # Debounce delay
             break  # Exit the interval menu loop
 
+# Handle Loop Interval menu interactions
 def handle_loop_interval_menu():
     global loop_interval_value
 
@@ -194,6 +209,7 @@ def handle_loop_interval_menu():
             start_attack()  # Start the attack in the background
             break  # Exit the loop interval menu loop
 
+# Start advertising thread for AppleJuice attack
 def start_attack():
     global advertising_thread
     # Start advertising in a new thread
@@ -206,6 +222,7 @@ def start_attack():
             break  # Exit the attack running loop
     exit_menu()
 
+# Check for button presses and handle menu navigation
 def check_buttons():
     global selected_index, display_start_index, payload_selected_index
 
@@ -244,8 +261,9 @@ def check_buttons():
             handle_interval_menu()  # Move to the interval menu
         elif current_menu == usb_submenu and current_menu[selected_index] == "Rubber Ducky":
             enter_menu(rubber_ducky_submenu)
-        elif current_menu == rubber_ducky_submenu and current_menu[selected_index] == "test-payload":
-            test_payload()  # Trigger the typing of "test" :)
+        elif current_menu == rubber_ducky_submenu:
+            selected_script = rubber_ducky_submenu[selected_index] + ".ducky"  # Get the full filename
+            interpret_ducky_script(selected_script)  # Execute the script
         button_pressed = True
         time.sleep(0.2)  # Debounce delay
     elif any(not btn.value() for btn in button_left) and previous_menu_stack:
@@ -256,7 +274,9 @@ def check_buttons():
     if button_pressed:
         display_menu(current_menu)  # Update the display immediately if a button is pressed
 
+# Start the menu system
 def start_menu():
+    load_ducky_scripts()  # Load .ducky files at startup
     while True:
         check_buttons()
         display_menu(current_menu)
