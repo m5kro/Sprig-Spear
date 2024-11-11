@@ -1,5 +1,7 @@
 from machine import Pin, SPI
+import os
 import time
+import sdcard
 
 # ST7735 Commands
 ST7735_SWRESET = 0x01
@@ -29,12 +31,15 @@ ST7735_NORON   = 0x13
 BLACK = 0x0000
 WHITE = 0xFFFF
 
-# Pin Configuration
+# Pin Configuration for ST7735 Display
 TFT_CS = Pin(20, Pin.OUT)
 TFT_RST = Pin(26, Pin.OUT)
 TFT_DC = Pin(22, Pin.OUT)
 
-# SPI Setup
+# Pin Configuration for SD Card
+CARD_CS = Pin(21, Pin.OUT)
+
+# SPI Setup for Display and SD Card (shared SPI bus)
 spi = SPI(0, baudrate=30000000, polarity=0, phase=0, sck=Pin(18), mosi=Pin(19), miso=Pin(16))
 
 def write_command(cmd):
@@ -152,3 +157,16 @@ def update_display(fb):
     TFT_CS.value(0)
     spi.write(fb)
     TFT_CS.value(1)
+
+# Attempt to mount SD card if available
+def mount_sd():
+    try:
+        # Initialize SD card
+        sd = sdcard.SDCard(spi, CARD_CS, baudrate=30000000)  # Initialize SD card on the same SPI bus at the same speed
+
+        # Try to mount the SD card
+        os.mount(sd, "/sd")
+    except OSError:
+        spi.init(baudrate=30000000, polarity=0, phase=0)
+        # If SD card mount fails, fall back to internal storage
+        print("SD card not accessible. Using internal storage.")

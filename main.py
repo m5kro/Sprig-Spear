@@ -44,10 +44,29 @@ pwm_power_light = PWM(Pin(power_light_pin))
 pwm_power_light.freq(1000)
 pwm_power_light.duty_u16(65535 // 8)  # Dim the light
 
-# Load .ducky scripts at startup
+status_light_pin = 4
+pwm_status_light = PWM(Pin(status_light_pin))
+pwm_status_light.freq(1000)
+
+def flash_status_light():
+    pwm_status_light.duty_u16(65535 // 8)  # Turn on status light
+    time.sleep(0.1)  # Keep it on for a fraction of a second
+    pwm_status_light.duty_u16(0)  # Turn off the status light
+
+# Load .ducky scripts from SD card or root directory at startup
 def load_ducky_scripts():
     global rubber_ducky_submenu
-    ducky_files = [f[:-6] for f in os.listdir() if f.endswith('.ducky')]
+    ducky_files = []
+
+    # Try to list files from the SD card directory
+    try:
+        ducky_files = ["/sd/" + f[:-6] for f in os.listdir("/sd") if f.endswith('.ducky')]
+        ducky_files += [f[:-6] for f in os.listdir() if f.endswith('.ducky')]
+    except OSError:
+        # If SD card is unavailable, list files from root directory
+        print("SD card not accessible.")
+        ducky_files = [f[:-6] for f in os.listdir() if f.endswith('.ducky')]
+
     rubber_ducky_submenu = ducky_files  # Update the submenu with the list of files
 
 # Display the menu on the screen
@@ -167,19 +186,23 @@ def handle_interval_menu():
 
     while True:
         if any(not btn.value() for btn in button_up):
+            flash_status_light()  # Flash status light on button press
             if interval_value < 950:
                 interval_value += 50
             display_interval_menu()
             time.sleep(0.2)  # Debounce delay
         elif any(not btn.value() for btn in button_down):
+            flash_status_light()  # Flash status light on button press
             if interval_value > 50:
                 interval_value -= 50
             display_interval_menu()
             time.sleep(0.2)  # Debounce delay
         elif any(not btn.value() for btn in button_right):
+            flash_status_light()  # Flash status light on button press
             handle_loop_interval_menu()  # Move to the loop interval menu
             break  # Exit the interval menu loop
         elif any(not btn.value() for btn in button_left):
+            flash_status_light()  # Flash status light on button press
             time.sleep(0.2)  # Debounce delay
             break  # Exit the interval menu loop
 
@@ -192,26 +215,31 @@ def handle_loop_interval_menu():
 
     while True:
         if any(not btn.value() for btn in button_up):
+            flash_status_light()  # Flash status light on button press
             if loop_interval_value < 9:
                 loop_interval_value += 1
             display_loop_interval_menu()
             time.sleep(0.2)  # Debounce delay
         elif any(not btn.value() for btn in button_down):
+            flash_status_light()  # Flash status light on button press
             if loop_interval_value > 1:
                 loop_interval_value -= 1
             display_loop_interval_menu()
             time.sleep(0.2)  # Debounce delay
         elif any(not btn.value() for btn in button_left):
+            flash_status_light()  # Flash status light on button press
             time.sleep(0.2)  # Debounce delay
             handle_interval_menu()  # Return to the interval menu
             break  # Exit the loop interval menu loop
         elif any(not btn.value() for btn in button_right):
+            flash_status_light()  # Flash status light on button press
             start_attack()  # Start the attack in the background
             break  # Exit the loop interval menu loop
 
 # Start advertising thread for AppleJuice attack
 def start_attack():
     global advertising_thread
+    pwm_status_light.duty_u16(65535 // 8)  # Keep status light on during attack
     # Start advertising in a new thread
     advertising_thread = _thread.start_new_thread(applejuice.apple_juice_advertise, (payload_selected_index, interval_value, loop_interval_value))
     display_attack_running()
@@ -219,6 +247,7 @@ def start_attack():
     while True:
         if any(not btn.value() for btn in button_left):
             applejuice.stop_advertising()  # Stop the advertising thread
+            pwm_status_light.duty_u16(0)  # Turn off the status light when attack stops
             break  # Exit the attack running loop
     exit_menu()
 
@@ -229,6 +258,7 @@ def check_buttons():
     button_pressed = False
 
     if any(not btn.value() for btn in button_up):
+        flash_status_light()  # Flash status light on button press
         if selected_index > 0:
             selected_index -= 1
             if selected_index < display_start_index:
@@ -239,6 +269,7 @@ def check_buttons():
         button_pressed = True
         time.sleep(0.2)  # Debounce delay
     elif any(not btn.value() for btn in button_down):
+        flash_status_light()  # Flash status light on button press
         if selected_index < len(current_menu) - 1:
             selected_index += 1
             if selected_index >= display_start_index + max_display_items:
@@ -249,6 +280,7 @@ def check_buttons():
         button_pressed = True
         time.sleep(0.2)  # Debounce delay
     elif any(not btn.value() for btn in button_right):
+        flash_status_light()  # Flash status light on button press
         if current_menu == main_menu:
             if current_menu[selected_index] == "Bluetooth":
                 enter_menu(bluetooth_submenu)
@@ -267,6 +299,7 @@ def check_buttons():
         button_pressed = True
         time.sleep(0.2)  # Debounce delay
     elif any(not btn.value() for btn in button_left) and previous_menu_stack:
+        flash_status_light()  # Flash status light on button press
         exit_menu()
         button_pressed = True
         time.sleep(0.2)  # Debounce delay
@@ -284,4 +317,5 @@ def start_menu():
 
 # Initialize and display
 ST7735.init_display()
+ST7735.mount_sd()
 start_menu()
