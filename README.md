@@ -9,18 +9,19 @@ ECTO-1A for the [AppleJuice](https://github.com/ECTO-1A/AppleJuice) Code
 2. USB Keyboard
 3. Read rubber ducky payloads (not all functions supported)
 4. Read from microsd card slot
+5. WiFi Evil Twin (test phase, read disclaimer)
 # Upcoming Features (No particular order)
 1. WiFi Deauth Attack (missing monitor mode)
 2. WiFi Beacon Spam
-3. WiFi Evil Twin
-4. Bluetooth Deauth
-5. Bluetooth L2CAP ping
-6. Bluetooth Fake device (maybe)
-7. Pn532 NFC addon (Very Unlikely)
-8. Rewrite/Reorganize code
+3. Bluetooth Deauth
+4. Bluetooth L2CAP ping
+5. Bluetooth Fake device (maybe)
+6. Pn532 NFC addon (Very Unlikely)
+7. Rewrite/Reorganize code
 # Disclaimers
 1. I'm not responsible for what you do so don't do anything stupid. (I know some of you will)
 2. AppleJuice attack has been patched by Apple. The attack is also unreliable due to possible ETIMEOUT Error.
+3. WiFi evil twin (also called captive portal) doesn't fully work right now due to an unknown issue with threading. The "test" wifi is available as well as the login page on 192.168.4.1 however DNS has not been implemented.
 # Setup Instructions
 1. Download [Micropython](https://micropython.org/download/RPI_PICO_W/)
 2. Flash to the Pico W (Newer versions of the Sprig come with a Pico W)

@@ -6,6 +6,8 @@ import ST7735  # Import the display module
 import framebuf
 from keystrokes import interpret_ducky_script # For executing Rubber Ducky scripts
 import os
+import wifi
+import captivewifi
 
 # Color Definitions
 BLACK = ST7735.BLACK
@@ -19,6 +21,8 @@ button_right = [Pin(15, Pin.IN, Pin.PULL_UP), Pin(8, Pin.IN, Pin.PULL_UP)]
 
 # Menu Configuration
 main_menu = ["WiFi", "Bluetooth", "USB"]
+wifi_submenu = ["Captive Portal"]
+captive_portal_submenu = ["Test"]
 bluetooth_submenu = ["AppleJuice"]
 usb_submenu = ["Rubber Ducky"]
 rubber_ducky_submenu = []  # This will be populated with .ducky files on startup
@@ -251,6 +255,22 @@ def start_attack():
             break  # Exit the attack running loop
     exit_menu()
 
+# Captive Portal Test
+def handle_captive_portal_test():
+    global captivewifi_thread
+    pwm_status_light.duty_u16(65535 // 8)  # Keep status light on during attack
+    wifi.start_access_point()
+    # Start captive portal, cant stop as wifi requires its own thread
+    captivewifi.start_http_server()
+    display_attack_running()  # Show the "Attack Running!" message (never gets here)
+
+    # Stopping not implemented yet
+    while True:
+        if any(not btn.value() for btn in button_left):  # Detect back button press
+            pwm_status_light.duty_u16(0)  # Turn off the status light when attack stops
+            break  # Exit the loop and return to the previous menu
+    exit_menu()  # Exit back to the previous menu
+
 # Check for button presses and handle menu navigation
 def check_buttons():
     global selected_index, display_start_index, payload_selected_index
@@ -282,10 +302,16 @@ def check_buttons():
     elif any(not btn.value() for btn in button_right):
         flash_status_light()  # Flash status light on button press
         if current_menu == main_menu:
-            if current_menu[selected_index] == "Bluetooth":
+            if current_menu[selected_index] == "WiFi":
+                enter_menu(wifi_submenu)
+            elif current_menu[selected_index] == "Bluetooth":
                 enter_menu(bluetooth_submenu)
             elif current_menu[selected_index] == "USB":
                 enter_menu(usb_submenu)
+        elif current_menu == wifi_submenu and current_menu[selected_index] == "Captive Portal":
+            enter_menu(captive_portal_submenu)
+        elif current_menu == captive_portal_submenu and current_menu[selected_index] == "Test":
+            handle_captive_portal_test()  # Handle captive portal test
         elif current_menu == bluetooth_submenu and current_menu[selected_index] == "AppleJuice":
             enter_menu(payload_names)
         elif current_menu == payload_names:
