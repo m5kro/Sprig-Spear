@@ -6,7 +6,6 @@ import ST7735  # Import the display module
 import framebuf
 from keystrokes import interpret_ducky_script # For executing Rubber Ducky scripts
 import os
-import wifi
 import captivewifi
 
 # Color Definitions
@@ -257,18 +256,10 @@ def start_attack():
 
 # Captive Portal Test
 def handle_captive_portal_test():
-    global captivewifi_thread
     pwm_status_light.duty_u16(65535 // 8)  # Keep status light on during attack
-    wifi.start_access_point()
-    # Start captive portal, cant stop as wifi requires its own thread
-    captivewifi.start_http_server()
-    display_attack_running()  # Show the "Attack Running!" message (never gets here)
-
-    # Stopping not implemented yet
-    while True:
-        if any(not btn.value() for btn in button_left):  # Detect back button press
-            pwm_status_light.duty_u16(0)  # Turn off the status light when attack stops
-            break  # Exit the loop and return to the previous menu
+    display_attack_running()  # Show the "Attack Running!" message
+    captivewifi.startup() # Start captive portal in main thread due to weird wifi limitations
+    pwm_status_light.duty_u16(0)  # Turn off the status light when attack stops
     exit_menu()  # Exit back to the previous menu
 
 # Check for button presses and handle menu navigation
