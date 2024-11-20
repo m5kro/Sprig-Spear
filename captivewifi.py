@@ -15,6 +15,23 @@ wifi_interface = network.WLAN(network.AP_IF)
 # DNS settings
 SERVER_IP = '192.168.4.1'
 
+# Path to the portal files
+portal_path = "portals/Test/"
+
+
+def read_config_file(path):
+    """Reads SSID and PASS from config.txt."""
+    config = {"SSID": "default_ssid", "PASS": ""}
+    try:
+        with open(f"{path}/config.txt", "r") as f:
+            for line in f:
+                if line.strip():
+                    key, value = map(str.strip, line.split("=", 1))
+                    config[key.upper()] = value.strip('"')
+    except FileNotFoundError:
+        print("config.txt not found, using default values.")
+    return config
+
 
 # Start the access point, slightly different from the original code as pico handles the wifi differently
 def start_access_point(local_ip="192.168.4.1", essid=None, password=None):
@@ -88,8 +105,13 @@ class MyApp:
         # Set up button interrupts
         self.setup_button_interrupts()
 
+        # Read configuration file
+        config = read_config_file(portal_path)
+        ssid = config.get("SSID")
+        password = config.get("PASS")
+
         # Start the wifi AP
-        start_access_point()
+        start_access_point(essid=ssid, password=password)
 
         # Create the server and add task to event loop
         server = asyncio.start_server(self.handle_http_connection, "0.0.0.0", 80)
@@ -132,9 +154,11 @@ class MyApp:
             response = 'HTTP/1.0 200 OK\r\n\r\nCredentials saved.'
         else:
             # Handle GET requests
-            response = 'HTTP/1.0 200 OK\r\n\r\n'
-            with open('index.html') as f:
-                response += f.read()
+            try:
+                with open(f"{portal_path}/index.html") as f:
+                    response = 'HTTP/1.0 200 OK\r\n\r\n' + f.read()
+            except FileNotFoundError:
+                response = 'HTTP/1.0 404 NOT FOUND\r\n\r\nPage not found.'
 
         await writer.awrite(response)
         await writer.aclose()
@@ -182,7 +206,10 @@ class MyApp:
         wifi_interface.active(False)
 
 
-def startup():
+def startup(given_path=None):
+    if given_path:
+        global portal_path
+        portal_path = given_path
     """Main code entrypoint."""
     try:
         myapp = MyApp()

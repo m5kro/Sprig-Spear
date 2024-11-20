@@ -10,19 +10,18 @@ Chris Hager for most of the [Captive Portal](https://github.com/metachris/microp
 2. USB Keyboard
 3. Read rubber ducky payloads (not all functions supported)
 4. Read from microsd card slot
-5. WiFi Evil Twin (test phase)
+5. WiFi Evil Twin
+6. WiFi Evil Twin customization (read disclaimer)
 # Upcoming Features (No particular order)
 1. WiFi Deauth Attack (missing monitor mode)
 2. WiFi Beacon Spam
 3. Bluetooth Deauth
 4. Bluetooth L2CAP ping
 5. Bluetooth Fake device (maybe)
-6. Pn532 NFC addon (Very Unlikely)
-7. Rewrite/Reorganize code
-8. WiFi Evil Twin customization
 # Disclaimers
 1. I'm not responsible for what you do so don't do anything stupid. (I know some of you will)
 2. AppleJuice attack has been patched by Apple. The attack is also unreliable due to possible ETIMEOUT Error.
+3. Captive portal files can only go up to a certain size before the pico freaks out and hard resets.
 # Setup Instructions
 1. Download [Micropython](https://micropython.org/download/RPI_PICO_W/)
 2. Flash to the Pico W (Newer versions of the Sprig come with a Pico W)
@@ -30,7 +29,46 @@ Chris Hager for most of the [Captive Portal](https://github.com/metachris/microp
 4. Install mpremote using pip `python3 -m pip install mpremote`
 5. Install keyboard libraries `python3 -m mpremote mip install usb-device-keyboard`, you may need to close vscode or thonny during this part
 6. Install sdcard libraries `python3 -m mpremote mip install sdcard`
-7. Put rubber ducky payloads at root or on sdcard (fat32) as .ducky files
-8. Reboot the Pico W
-9. Use buttons to navigate. Up/Down to select, Right to enter, Left to go back
-10. You can find captured credentials in cred.txt at the root folder
+7. Put rubber ducky payloads in a folder called ducks at root or on sdcard (fat32) as .ducky files
+8. Follow instructions below for captive portals
+9. Reboot the Pico W
+10. Use buttons to navigate. Up/Down to select, Right to enter, Left to go back
+11. You can find captured credentials in cred.txt at the root folder
+# Captive Portal Instructions
+1. Create a folder called portals in root or on sdcard
+2. Inside portals create a folder with whatever name you want
+3. Inside your created folder, make a file called config.txt
+4. Place your SSID (WiFi name) and password inside config.txt <br>
+Example (leave PASS blank for open network): <br>
+```
+SSID = "TEST"
+PASS = ""
+```
+5. Create a file called index.html
+6. Place your login page inside index.html, have it return username and password through POST requests <br>
+Note: There is no support for images or reading other files as index.html can only reach a few kb in size <br>
+Example:
+```
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login Page</title>
+</head>
+<body>
+    <h1>Welcome to the Captive Portal</h1>
+    <form action="/" method="POST">
+        <label for="username">Username:</label>
+        <br>
+        <input type="text" id="username" name="username" required>
+        <br><br>
+        <label for="password">Password:</label>
+        <br>
+        <input type="password" id="password" name="password" required>
+        <br><br>
+        <button type="submit">Login</button>
+    </form>
+    </body>
+</html>
+```

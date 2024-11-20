@@ -25,6 +25,7 @@ captive_portal_submenu = ["Test"]
 bluetooth_submenu = ["AppleJuice"]
 usb_submenu = ["Rubber Ducky"]
 rubber_ducky_submenu = []  # This will be populated with .ducky files on startup
+captive_portal_list = [] # This will be populated with captive portal options
 payload_names = applejuice.payload_names
 
 # State Variables
@@ -63,14 +64,27 @@ def load_ducky_scripts():
 
     # Try to list files from the SD card directory
     try:
-        ducky_files = ["/sd/" + f[:-6] for f in os.listdir("/sd") if f.endswith('.ducky')]
-        ducky_files += [f[:-6] for f in os.listdir() if f.endswith('.ducky')]
+        ducky_files = ["/sd/ducks/" + f[:-6] for f in os.listdir("/sd/ducks") if f.endswith('.ducky')]
+        ducky_files += ["ducks/" + f[:-6] for f in os.listdir("ducks") if f.endswith('.ducky')]
     except OSError:
         # If SD card is unavailable, list files from root directory
-        print("SD card not accessible.")
-        ducky_files = [f[:-6] for f in os.listdir() if f.endswith('.ducky')]
+        ducky_files = ["ducks/" +f[:-6] for f in os.listdir("ducks") if f.endswith('.ducky')]
 
     rubber_ducky_submenu = ducky_files  # Update the submenu with the list of files
+
+def load_captive_portal_folders():
+    global captive_portal_list
+    captive_portals = []  # Reset the list of portals
+
+    # Try to list folders from the SD card directory
+    try:
+        captive_portals = ["/sd/portals/" + f for f in os.listdir("/sd/portals")]
+        captive_portals += ["portals/" + f for f in os.listdir("portals")]
+    except OSError:
+        # If SD card is unavailable, list folders from root directory
+        captive_portals = ["portals/" + f for f in os.listdir("portals")]
+
+    captive_portal_list = captive_portals  # Update the list of captive portals
 
 # Display the menu on the screen
 def display_menu(menu):
@@ -255,14 +269,14 @@ def start_attack():
     exit_menu()
 
 # Captive Portal Test
-def handle_captive_portal_test():
+def handle_captive_portal(selected_path):
     pwm_status_light.duty_u16(65535 // 8)  # Keep status light on during attack
     display_attack_running()  # Show the "Attack Running!" message
-    captivewifi.startup() # Start captive portal in main thread due to weird wifi limitations
+    captivewifi.startup(selected_path) # Start captive portal in main thread due to weird wifi limitations
     pwm_status_light.duty_u16(0)  # Turn off the status light when attack stops
     exit_menu()  # Exit back to the previous menu
 
-# Check for button presses and handle menu navigation
+# Button Handling Updated for Captive Portal
 def check_buttons():
     global selected_index, display_start_index, payload_selected_index
 
@@ -300,9 +314,10 @@ def check_buttons():
             elif current_menu[selected_index] == "USB":
                 enter_menu(usb_submenu)
         elif current_menu == wifi_submenu and current_menu[selected_index] == "Captive Portal":
-            enter_menu(captive_portal_submenu)
-        elif current_menu == captive_portal_submenu and current_menu[selected_index] == "Test":
-            handle_captive_portal_test()  # Handle captive portal test
+            enter_menu(captive_portal_list)
+        elif current_menu == captive_portal_list:
+            selected_path = captive_portal_list[selected_index]
+            handle_captive_portal(selected_path)
         elif current_menu == bluetooth_submenu and current_menu[selected_index] == "AppleJuice":
             enter_menu(payload_names)
         elif current_menu == payload_names:
@@ -324,9 +339,10 @@ def check_buttons():
     if button_pressed:
         display_menu(current_menu)  # Update the display immediately if a button is pressed
 
-# Start the menu system
+# Start Menu Updated to Load Captive Portals
 def start_menu():
     load_ducky_scripts()  # Load .ducky files at startup
+    load_captive_portal_folders()  # Load captive portal folders at startup
     while True:
         check_buttons()
         display_menu(current_menu)
