@@ -26,6 +26,8 @@ SPECIAL_KEYS = {
     'LEFT': KeyCode.LEFT,
     'RIGHT': KeyCode.RIGHT,
     'BACKSPACE': KeyCode.BACKSPACE,
+    'SPACE': KeyCode.SPACE,
+    'TAB': KeyCode.TAB,
     'F1': KeyCode.F1,
     'F2': KeyCode.F2,
     'F3': KeyCode.F3,

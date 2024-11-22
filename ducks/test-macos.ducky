@@ -1,2 +1,3 @@
 REM This is just to test the menu functions
+GUI SPACE
 STRING works
