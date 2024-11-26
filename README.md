@@ -22,6 +22,7 @@ Chris Hager for most of the [Captive Portal](https://github.com/metachris/microp
 1. I'm not responsible for what you do so don't do anything stupid. (I know some of you will)
 2. AppleJuice attack has been patched by Apple. The attack is also unreliable due to possible ETIMEOUT Error.
 3. Captive portal files can only go up to a certain size before the pico freaks out and hard resets.
+4. Applejuice attacks may take up to 5 seconds to exit.
 # Setup Instructions
 1. Download [Micropython](https://micropython.org/download/RPI_PICO_W/)
 2. Flash to the Pico W (Newer versions of the Sprig come with a Pico W)

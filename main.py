@@ -1,6 +1,5 @@
 from machine import Pin, PWM, Timer
 import time
-import _thread
 import applejuice
 import ST7735  # Import the display module
 import framebuf
@@ -37,10 +36,9 @@ current_menu = main_menu
 previous_menu_stack = []
 scroll_offset = 0
 last_scroll_time = time.ticks_ms()  # To control scrolling speed
-payload_selected_index = None  # To save the selected payload index
+payload_selected_index = 0  # To save the selected payload index
 interval_value = 200  # Initial interval value
 loop_interval_value = 5  # Initial loop interval value
-advertising_thread = None  # To handle the advertising thread
 
 # Power Light Configuration
 power_light_pin = 28
@@ -255,17 +253,10 @@ def handle_loop_interval_menu():
 
 # Start advertising thread for AppleJuice attack
 def start_attack():
-    global advertising_thread
     pwm_status_light.duty_u16(65535 // 8)  # Keep status light on during attack
-    # Start advertising in a new thread
-    advertising_thread = _thread.start_new_thread(applejuice.apple_juice_advertise, (payload_selected_index, interval_value, loop_interval_value))
-    display_attack_running()
-
-    while True:
-        if any(not btn.value() for btn in button_left):
-            applejuice.stop_advertising()  # Stop the advertising thread
-            pwm_status_light.duty_u16(0)  # Turn off the status light when attack stops
-            break  # Exit the attack running loop
+    display_attack_running() # Show the "Attack Running!" message
+    applejuice.startup(payload_selected_index, interval_value, loop_interval_value) # Start the attack
+    pwm_status_light.duty_u16(0)  # Turn off the status light when attack stops
     exit_menu()
 
 # Captive Portal Test
