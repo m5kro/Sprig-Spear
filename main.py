@@ -6,6 +6,7 @@ import framebuf
 from keystrokes import interpret_ducky_script # For executing Rubber Ducky scripts
 import os
 import captivewifi
+import beaconspam
 
 # Color Definitions
 BLACK = ST7735.BLACK
@@ -19,12 +20,13 @@ button_right = [Pin(15, Pin.IN, Pin.PULL_UP), Pin(8, Pin.IN, Pin.PULL_UP)]
 
 # Menu Configuration
 main_menu = ["WiFi", "Bluetooth", "USB"]
-wifi_submenu = ["Captive Portal"]
+wifi_submenu = ["Captive Portal", "Beacon Spam"]
 captive_portal_submenu = ["Test"]
 bluetooth_submenu = ["AppleJuice"]
 usb_submenu = ["Rubber Ducky"]
 rubber_ducky_submenu = []  # This will be populated with .ducky files on startup
 captive_portal_list = [] # This will be populated with captive portal options
+beacon_names = [] # This will be populated with beacon names on startup
 payload_names = applejuice.payload_names
 
 # State Variables
@@ -83,6 +85,23 @@ def load_captive_portal_folders():
         captive_portals = ["portals/" + f for f in os.listdir("portals")]
 
     captive_portal_list = captive_portals  # Update the list of captive portals
+
+def load_beacon_names():
+    global beacon_names
+    beacon_list = []  # Reset the list of beacons
+
+    # Try to get contents of beacons.txt from the SD card directory
+    try:
+        with open("/sd/beacons.txt") as f:
+            beacon_list = f.read().splitlines()
+        with open("beacons.txt") as f:
+            beacon_list += f.read().splitlines()
+    except OSError:
+        # If SD card is unavailable, get contents of beacons.txt from root directory
+        with open("beacons.txt") as f:
+            beacon_list = f.read().splitlines()
+    
+    beacon_names = beacon_list  # Update the list of beacon names
 
 # Display the menu on the screen
 def display_menu(menu):
@@ -267,6 +286,13 @@ def handle_captive_portal(selected_path):
     pwm_status_light.duty_u16(0)  # Turn off the status light when attack stops
     exit_menu()  # Exit back to the previous menu
 
+def handle_beacon_spam(beacon_names):
+    pwm_status_light.duty_u16(65535 // 8)  # Keep status light on during attack
+    display_attack_running()  # Show the "Attack Running!" message
+    beaconspam.startup(beacon_names)  # Start beacon spam in main thread
+    pwm_status_light.duty_u16(0)  # Turn off the status light when attack stops
+    exit_menu()  # Exit back to the previous menu
+
 # Button Handling Updated for Captive Portal
 def check_buttons():
     global selected_index, display_start_index, payload_selected_index
@@ -309,6 +335,8 @@ def check_buttons():
         elif current_menu == captive_portal_list:
             selected_path = captive_portal_list[selected_index]
             handle_captive_portal(selected_path)
+        elif current_menu == wifi_submenu and current_menu[selected_index] == "Beacon Spam":
+            handle_beacon_spam(beacon_names)
         elif current_menu == bluetooth_submenu and current_menu[selected_index] == "AppleJuice":
             enter_menu(payload_names)
         elif current_menu == payload_names:
@@ -334,6 +362,7 @@ def check_buttons():
 def start_menu():
     load_ducky_scripts()  # Load .ducky files at startup
     load_captive_portal_folders()  # Load captive portal folders at startup
+    load_beacon_names()  # Load beacon names at startup
     while True:
         check_buttons()
         display_menu(current_menu)

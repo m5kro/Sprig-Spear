@@ -31,10 +31,11 @@ Chris Hager for most of the [Captive Portal](https://github.com/metachris/microp
 5. Install keyboard libraries `python3 -m mpremote mip install usb-device-keyboard`, you may need to close vscode or thonny during this part
 6. Install sdcard libraries `python3 -m mpremote mip install sdcard`
 7. Put rubber ducky payloads in a folder called ducks at root or on sdcard (fat32) as .ducky files
-8. Follow instructions below for captive portals
-9. Reboot the Pico W
-10. Use buttons to navigate. Up/Down to select, Right to enter, Left to go back
-11. You can find captured credentials in cred.txt at the root folder
+8. Put beacons.txt in root or on sdcard (contains SSID names for beacon spamming)
+9. Follow instructions below for captive portals
+10. Reboot the Pico W
+11. Use buttons to navigate. Up/Down to select, Right to enter, Left to go back
+12. You can find captured credentials in cred.txt at the root folder
 # Captive Portal Instructions
 1. Create a folder called portals in root or on sdcard
 2. Inside portals create a folder with whatever name you want
