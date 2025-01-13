@@ -12,12 +12,12 @@ Chris Hager for most of the [Captive Portal](https://github.com/metachris/microp
 4. Read from microsd card slot
 5. WiFi Evil Twin
 6. WiFi Evil Twin customization (read disclaimer)
+7. WiFi Beacon Spam
 # Upcoming Features (No particular order)
 1. WiFi Deauth Attack (missing monitor mode)
-2. WiFi Beacon Spam
-3. Bluetooth Deauth
-4. Bluetooth L2CAP ping
-5. Bluetooth Fake device (maybe)
+2. Bluetooth Deauth
+3. Bluetooth L2CAP ping
+4. Bluetooth Fake device (maybe)
 # Disclaimers
 1. I'm not responsible for what you do so don't do anything stupid. (I know some of you will)
 2. AppleJuice attack has been patched by Apple. The attack is also unreliable due to possible ETIMEOUT Error.
