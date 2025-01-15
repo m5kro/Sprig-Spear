@@ -46,7 +46,7 @@ Chris Hager for most of the [Captive Portal](https://github.com/metachris/microp
 <br>
 Note: You must create a ducks folder, a beacons.txt file, and a portals folder at root or else the device won't boot<br>
 <br>
-Optional: Place bootimg.raw at root to get a fun splash screen at boot
+Optional: Place bootimg.raw at root to get a fun splash screen at boot<br>
 # Captive Portal Instructions
 1. Create a folder called portals in root or on sdcard
 2. Inside portals create a folder with whatever name you want
