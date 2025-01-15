@@ -45,8 +45,8 @@ Chris Hager for most of the [Captive Portal](https://github.com/metachris/microp
 13. You can find captured credentials in cred.txt at the root folder<br>
 <br>
 Note: You must create a ducks folder, a beacons.txt file, and a portals folder at root or else the device won't boot<br>
-<br>
-Optional: Place bootimg.raw at root to get a fun splash screen at boot<br>
+Optional: Place bootimg.raw at root to get a fun splash screen at boot
+
 # Captive Portal Instructions
 1. Create a folder called portals in root or on sdcard
 2. Inside portals create a folder with whatever name you want
