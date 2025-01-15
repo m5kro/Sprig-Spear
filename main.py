@@ -1,3 +1,4 @@
+# Have fun! - m5kro
 from machine import Pin, PWM, Timer
 import time
 import applejuice
@@ -7,6 +8,7 @@ from keystrokes import interpret_ducky_script # For executing Rubber Ducky scrip
 import os
 import captivewifi
 import beaconspam
+import blescan
 
 # Color Definitions
 BLACK = ST7735.BLACK
@@ -22,8 +24,10 @@ button_right = [Pin(15, Pin.IN, Pin.PULL_UP), Pin(8, Pin.IN, Pin.PULL_UP)]
 main_menu = ["WiFi", "Bluetooth", "USB"]
 wifi_submenu = ["Captive Portal", "Beacon Spam"]
 captive_portal_submenu = ["Test"]
-bluetooth_submenu = ["AppleJuice"]
+bluetooth_submenu = ["AppleJuice", "BLE Scan"]
 usb_submenu = ["Rubber Ducky"]
+BLEscan_submenu = ["Scan"] # This will be populated with BLE device addresses on scan
+BLEdevices = []  # This will be populated with BLE devices on scan
 rubber_ducky_submenu = []  # This will be populated with .ducky files on startup
 captive_portal_list = [] # This will be populated with captive portal options
 beacon_names = [] # This will be populated with beacon names on startup
@@ -102,6 +106,53 @@ def load_beacon_names():
             beacon_list = f.read().splitlines()
     
     beacon_names = beacon_list  # Update the list of beacon names
+
+def display_boot_img(img_width=160, img_height=128):
+    width = 160
+    height = 128
+
+    # Get the raw img data
+    try:
+        with open("bootimg.raw", "rb") as f:
+            image_data = bytearray(f.read())
+    except OSError:
+        # If bootimg.raw is not found
+        return
+    
+    # Dynamically allocate framebuffer
+    fb = framebuf.FrameBuffer(bytearray(width * height * 2), width, height, framebuf.RGB565)
+    
+    fb.fill(BLACK)  # Fill background with black
+    ST7735.update_display(fb)  # Update the display
+
+    #fb.fill(BLACK)  # Fill background with black
+
+    # Calculate the scaling factor
+    scale_factor = height / img_height
+    scaled_width = int(img_width * scale_factor)
+
+    # Draw scaled image onto framebuffer
+    for y in range(height):
+        src_y = int(y / scale_factor)  # Map framebuffer y to image y
+        for x in range(scaled_width):
+            src_x = int(x / scale_factor)  # Map framebuffer x to image x
+            if src_x < img_width and src_y < img_height:
+                # Each pixel is 2 bytes (RGB565)
+                pixel_offset = (src_y * img_width + src_x) * 2
+                color = image_data[pixel_offset:pixel_offset + 2]
+                # Unpack the RGB565 color
+                color = int.from_bytes(color, 'big')  # RGB565 as 16-bit integer
+                fb.pixel(x + (width - scaled_width) // 2, y, color)  # Center horizontally
+
+    # Update display
+    ST7735.update_display(fb)
+
+    # Display for 3 seconds
+    time.sleep(3)
+
+    # Clear the screen
+    fb.fill(BLACK)
+    ST7735.update_display(fb)
 
 # Display the menu on the screen
 def display_menu(menu):
@@ -196,6 +247,20 @@ def display_attack_running():
     ST7735.update_display(fb)
     del fb  # Free framebuffer memory
 
+# Display "Scanning..." message
+def display_scanning():
+    # Dynamically allocate framebuffer
+    width = 160
+    height = 128
+    fb = framebuf.FrameBuffer(bytearray(width * height * 2), width, height, framebuf.RGB565)
+    fb.fill(BLACK)
+
+    # Display "Scanning..." in the middle of the screen
+    fb.text("Scanning...", 30, 50, WHITE)
+
+    ST7735.update_display(fb)
+    del fb  # Free framebuffer memory
+
 # Enter a new menu
 def enter_menu(new_menu):
     global current_menu, selected_index, display_start_index, previous_menu_stack
@@ -276,7 +341,6 @@ def start_attack():
     display_attack_running() # Show the "Attack Running!" message
     applejuice.startup(payload_selected_index, interval_value, loop_interval_value) # Start the attack
     pwm_status_light.duty_u16(0)  # Turn off the status light when attack stops
-    exit_menu()
 
 # Captive Portal Test
 def handle_captive_portal(selected_path):
@@ -284,14 +348,53 @@ def handle_captive_portal(selected_path):
     display_attack_running()  # Show the "Attack Running!" message
     captivewifi.startup(selected_path) # Start captive portal in main thread due to weird wifi limitations
     pwm_status_light.duty_u16(0)  # Turn off the status light when attack stops
-    exit_menu()  # Exit back to the previous menu
 
+# Beacon Spam
 def handle_beacon_spam(beacon_names):
     pwm_status_light.duty_u16(65535 // 8)  # Keep status light on during attack
     display_attack_running()  # Show the "Attack Running!" message
     beaconspam.startup(beacon_names)  # Start beacon spam in main thread
     pwm_status_light.duty_u16(0)  # Turn off the status light when attack stops
-    exit_menu()  # Exit back to the previous menu
+
+# Start BLE Scan
+def handle_ble_scan():
+    pwm_status_light.duty_u16(65535 // 8)  # Keep status light on during scan
+    display_scanning()  # Show the "Scanning..." message
+    global BLEdevices
+    BLEdevices = []  # Reset the list of BLE devices
+    BLEdevices = blescan.startup()  # Start BLE scan
+    global BLEscan_submenu
+    BLEscan_submenu = ["Scan"]
+    for device in BLEdevices:
+        BLEscan_submenu.append(device['address'])
+    pwm_status_light.duty_u16(0)  # Turn off the status light when scan stops
+    exit_menu()  # Exit the BLE scan submenu
+    enter_menu(BLEscan_submenu)  # Re-enter the BLE scan submenu
+
+def display_BLE_device_info(device_info):
+    # Dynamically allocate framebuffer
+    width = 160
+    height = 128
+    fb = framebuf.FrameBuffer(bytearray(width * height * 2), width, height, framebuf.RGB565)
+    fb.fill(BLACK)
+
+    # Display the BLE device info
+    fb.text("BLE Device", 20, 10, WHITE)
+    fb.text("Address:", 20, 30, WHITE)
+    fb.text(device_info['address'], 10, 50, WHITE)
+    fb.text("RSSI:", 20, 70, WHITE)
+    fb.text(str(device_info['rssi']), 70, 70, WHITE)
+    fb.text("Connectable:", 20, 90, WHITE)
+    fb.text(str(device_info['connectable']), 20, 110, WHITE)
+
+    ST7735.update_display(fb)
+    del fb  # Free framebuffer memory
+
+    # Wait for button press to return to the BLE scan submenu
+    while True:
+        if any(not btn.value() for btn in button_left):
+            flash_status_light()
+            break
 
 # Button Handling Updated for Captive Portal
 def check_buttons():
@@ -342,6 +445,13 @@ def check_buttons():
         elif current_menu == payload_names:
             payload_selected_index = selected_index
             handle_interval_menu()  # Move to the interval menu
+        elif current_menu == bluetooth_submenu and current_menu[selected_index] == "BLE Scan":
+            enter_menu(BLEscan_submenu)
+        # Pressing buttons too many times in BLE Scan submenu can cause pico to crash. likely due to memory overload :(
+        elif current_menu == BLEscan_submenu and current_menu[selected_index] == "Scan":
+            handle_ble_scan()
+        elif current_menu == BLEscan_submenu:
+            display_BLE_device_info(BLEdevices[selected_index - 1])
         elif current_menu == usb_submenu and current_menu[selected_index] == "Rubber Ducky":
             enter_menu(rubber_ducky_submenu)
         elif current_menu == rubber_ducky_submenu:
@@ -371,4 +481,5 @@ def start_menu():
 # Initialize and display
 ST7735.init_display()
 ST7735.mount_sd()
+display_boot_img()
 start_menu()
