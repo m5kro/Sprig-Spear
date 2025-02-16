@@ -1,3 +1,10 @@
+DEFINE #testconst somethinghere
+VAR $testvar = 123
+REM This is a test script!
+REM_BLOCK Testblock
+This shouldn't show up
+STRING This text won't be typed as it's inside the REM_BLOCK
+END_REM
 STRING Hello World!
 ENTER
 STRING abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPPQRSTUVWXYZ
@@ -6,11 +13,37 @@ STRING 1234567890
 ENTER
 STRING <>?:"{}|_+!@#$%^&*()
 ENTER
+STRINGLN Test new line using STRINGLN instead!
+STRING
+Test 
+out 
+	 the 
+	 STRING 
+	 block
+END_STRING
+ENTER
+STRINGLN
+	STRINGLN
+	 block!
+END_STRINGLN
+STRINGLN This is the test constant:#testconst
+STRINGLN This is the test variable:$testvar
+STRINGLN Variables need an equal sign between the name and value
+STRINGLN constants should not have an equal sign
+ENTER
+$testvar = ($testvar-3)
+STRINGLN This is the new test variable:$testvar
+STRINGLN Testing loops
+VAR $loop = 1
+WHILE ( $loop < 5 )
+	STRINGLN $loop
+	$loop = ( $loop + 1 )
+END_WHILE
 GUI r
 DELAY 100
 STRING notepad
 ENTER
 DELAY 100
 CTRL ALT DELETE
-DELAY 1000
+DELAY 2000
 ESCAPE

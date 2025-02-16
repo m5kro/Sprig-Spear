@@ -12,7 +12,7 @@ Chris Hager for most of the [Captive Portal](https://github.com/metachris/microp
 # Current Features
 1. Bluetooth AppleJuice Attack (Read Disclaimer)
 2. USB Keyboard
-3. Read rubber ducky payloads (not all functions supported)
+3. Read rubber ducky payloads (not all functions supported yet)
 4. Read from microsd card slot
 5. WiFi Evil Twin
 6. WiFi Evil Twin customization (read disclaimer)

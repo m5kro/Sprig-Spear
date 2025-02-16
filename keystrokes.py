@@ -2,32 +2,76 @@ import usb.device
 from usb.device.keyboard import KeyboardInterface, KeyCode
 import time
 
-# Initialize the keyboard interface
+# Dummy keyboard class for testing purposes
+"""
+class DummyKeyboard:
+    def __getattr__(self, name):
+        # Return a dummy function that does nothing
+        def dummy_function(*args, **kwargs):
+            # Optionally, log the call for debugging:
+            # print(f"Called {name} with args: {args} kwargs: {kwargs}")
+            pass
+        return dummy_function
+
+keyboard = DummyKeyboard()
+"""
+
+# Actual keyboard class, comment out to debug using the dummy keyboard
+
+# Initialize the keyboard interface only when running as a script.
 keyboard = KeyboardInterface()
 usb.device.get().init(keyboard, builtin_driver=True)
+
+
+# Various variables
+rem_block = False  # Flag to ignore REM_BLOCK sections
+string_block = False  # Flag for STRING BLOCK sections
+stringln_block = False  # Flag for STRINGLN BLOCK sections
+constants = {}  # Dictionary to store constants
+variables = {}  # Dictionary to store variables
+reading_while = False  # Flag to indicate if we are reading a while loop
+while_condition = ""  # String to store the while condition
+while_block = ""  # String to store the while block
 
 keypress_delay = 0  # Delay in seconds between keypresses, supports decimal values
 
 # Modifier keys dictionary
 MODIFIER_KEYS = {
     'CTRL': KeyCode.LEFT_CTRL,
+    'CONTROL': KeyCode.LEFT_CTRL,
     'SHIFT': KeyCode.LEFT_SHIFT,
     'ALT': KeyCode.LEFT_ALT,
-    'GUI': KeyCode.LEFT_UI,  # Commonly represents the Windows key
+    'GUI': KeyCode.LEFT_UI,  # Commonly represents the Windows or Command key
+    'COMMAND': KeyCode.LEFT_UI,  # Same as GUI
+    'WINDOWS': KeyCode.LEFT_UI  # Same as GUI
 }
 
 # Special keys dictionary
 SPECIAL_KEYS = {
     'ENTER': KeyCode.ENTER,
+    'INSERT': KeyCode.INSERT,
     'DELETE': KeyCode.DELETE,
+    'DEL': KeyCode.DELETE,
     'ESCAPE': KeyCode.ESCAPE,
     'UP': KeyCode.UP,
+    'UPARROW': KeyCode.UP,
     'DOWN': KeyCode.DOWN,
+    'DOWNARROW': KeyCode.DOWN,
     'LEFT': KeyCode.LEFT,
+    'LEFTARROW': KeyCode.LEFT,
     'RIGHT': KeyCode.RIGHT,
+    'RIGHTARROW': KeyCode.RIGHT,
     'BACKSPACE': KeyCode.BACKSPACE,
     'SPACE': KeyCode.SPACE,
     'TAB': KeyCode.TAB,
+    'CAPSLOCK': KeyCode.CAPS_LOCK,
+    'NUMLOCK': KeyCode.KP_NUM_LOCK,
+    'SCROLLLOCK': KeyCode.SCROLL_LOCK,
+    'PRINTSCREEN': KeyCode.PRINTSCREEN,
+    'PAGEUP': KeyCode.PAGEUP,
+    'PAGEDOWN': KeyCode.PAGEDOWN,
+    'HOME': KeyCode.HOME,
+    'END': KeyCode.END,
     'F1': KeyCode.F1,
     'F2': KeyCode.F2,
     'F3': KeyCode.F3,
@@ -39,7 +83,7 @@ SPECIAL_KEYS = {
     'F9': KeyCode.F9,
     'F10': KeyCode.F10,
     'F11': KeyCode.F11,
-    'F12': KeyCode.F12,
+    'F12': KeyCode.F12
 }
 
 # Map characters to KeyCodes
@@ -59,7 +103,7 @@ CHARACTER_TO_KEYCODE = {
 
 # Special characters that require Shift modifier
 SHIFT_REQUIRED_CHARACTERS = {
-    '!': KeyCode.N1, '@': KeyCode.N2, '#': KeyCode.HASH, '$': KeyCode.N4,
+    '!': KeyCode.N1, '@': KeyCode.N2, '#': KeyCode.N3, '$': KeyCode.N4,
     '%': KeyCode.N5, '^': KeyCode.N6, '&': KeyCode.N7, '*': KeyCode.N8,
     '(': KeyCode.N9, ')': KeyCode.N0, '_': KeyCode.MINUS, '+': KeyCode.EQUAL,
     '{': KeyCode.OPEN_BRACKET, '}': KeyCode.CLOSE_BRACKET, '|': KeyCode.BACKSLASH,
@@ -91,60 +135,223 @@ def send_string(text):
         else:
             print(f"Character '{char}' not found in keycode mapping.")
 
+def replacer(input):
+    global constants, variables
+    # Replace constants and variables in the input
+    for key in sorted(constants.keys(), key=len, reverse=True):
+        input = input.replace(key, str(constants[key]))
+    for key in sorted(variables.keys(), key=len, reverse=True):
+        input = input.replace(key, str(variables[key]))
+    return input
+
 def interpret_ducky_script(filename):
     # Interpret a DuckyScript file and execute commands
     with open(filename, 'r') as file:
         lines = file.readlines()
 
     for line in lines:
-        # Ignore lines that start with 'REM' as comments
-        if line.strip().startswith('REM'):
-            continue
+        interpret_line(line)
 
-        parts = line.strip().split()
-        command = parts[0].upper()
+def interpret_line(line):
+    global rem_block, string_block, stringln_block, constants, variables, reading_while, while_condition, while_block
+    # Split the line into parts
+    print(line)
+    parts = line.strip().split()
 
-        if command == 'STRING' and len(parts) > 1:
-            # Send a string
-            send_string(" ".join(parts[1:]))
-        elif command in SPECIAL_KEYS:
-            # Handle special keys
-            keyboard.send_keys([SPECIAL_KEYS[command]])
-            time.sleep(keypress_delay)
-            keyboard.send_keys([])  # Release key
-        elif command == 'DELAY' and len(parts) > 1:
-            # Delay for a specified time in milliseconds
-            delay_time = int(parts[1]) / 1000.0
-            time.sleep(delay_time)
-        elif command in MODIFIER_KEYS:
-            # Handle multiple modifier keys with a final key (ex. "CTRL ALT DELETE")
-            modifiers = []
-            keycode = None
+    if not parts:
+        return # Ignore empty lines
+    
+    command = parts[0].upper()
 
-            # Collect all modifiers and final key from the command
-            for part in parts:
-                part_upper = part.upper()
-                if part_upper in MODIFIER_KEYS:
-                    modifiers.append(MODIFIER_KEYS[part_upper])
-                elif part_upper in SPECIAL_KEYS:
-                    keycode = SPECIAL_KEYS[part_upper]
-                elif part.lower() in CHARACTER_TO_KEYCODE:
-                    keycode = CHARACTER_TO_KEYCODE[part.lower()]
-                elif part in SHIFT_REQUIRED_CHARACTERS:
-                    modifiers.append(MODIFIER_KEYS['SHIFT'])
-                    keycode = SHIFT_REQUIRED_CHARACTERS[part]
+    # Ignore REM blocks
+    if rem_block:
+        if command == 'END_REM':
+            rem_block = False
+        return
 
-            # If we have modifiers and a keycode, send them together
-            if modifiers and keycode:
-                keyboard.send_keys(modifiers + [keycode])
-                time.sleep(keypress_delay)
-                keyboard.send_keys([])  # Release keys
-            elif modifiers:
-                # If only modifiers were specified, press and release them alone
-                keyboard.send_keys(modifiers)
-                time.sleep(keypress_delay)
-                keyboard.send_keys([])  # Release keys
-            else:
-                print(f"No key specified for modifiers in command '{line.strip()}'")
+    if command == 'REM_BLOCK':
+        rem_block = True
+        return
+
+    # Handle STRING and STRINGLN blocks
+    if string_block:
+        if command == 'END_STRING':
+            string_block = False
         else:
-            print(f"Command '{command}' not recognized or not implemented.")
+            send_string(line.lstrip().rstrip('\n'))
+        return
+    
+    if stringln_block:
+        if command == 'END_STRINGLN':
+            stringln_block = False
+        else:
+            send_string(line.lstrip('\t').rstrip('\n') + '\n') # stringln block specifically removes first tab
+        return
+
+    # Ignore lines that start with 'REM' as comments
+    if command == 'REM':
+        return
+    
+    # Handle While loop, doesn't support nested loops
+    if command == 'WHILE':
+        reading_while = True
+        while_condition = line.lstrip().rstrip('\n')[6:]
+        return
+
+    if reading_while:
+        if command == 'END_WHILE':
+            reading_while = False
+            # Evaluate the while condition
+            while eval(replacer(while_condition)):
+                for block_line in while_block.split('\n'):
+                    interpret_line(block_line.lstrip())
+            while_condition = ""
+            while_block = ""
+        else:
+            while_block += line.lstrip()
+        return
+
+    if command == 'DEFINE':
+        # Define a constant
+        if len(parts) > 2:
+            # Check that the first char is a pound sign
+            if parts[1][0] != '#':
+                print(f"Invalid constant definition in line '{line.strip()}': Missing '#'")
+                return
+
+            # Check if it is String, int, or boolean
+            if parts[2].isdigit():
+                constants[parts[1]] = int(parts[2])
+            elif parts[2].upper() == 'TRUE':
+                constants[parts[1]] = True
+            elif parts[2].upper() == 'FALSE':
+                constants[parts[1]] = False
+            else:
+                # Check if it needs calculations
+                if parts[2][0] == '(':
+                    # Get the location of the first parentheses
+                    start = line.find('(')
+
+                    expression = replacer(line[start:])
+                    
+                    # Evaluate the expression
+                    try: 
+                        constants[parts[1]] = eval(expression) # Evaluate the expression and update the constant
+                    except Exception as e:
+                        constants[parts[1]] = line.lstrip()[(8 + len(parts[1])):] # Account for the length of the constant name and the 2 spaces
+                else:
+                    constants[parts[1]] = line.lstrip()[(8 + len(parts[1])):] # Account for the length of the constant name and the 2 spaces
+        return
+    elif command == 'VAR':
+        # Define a variable
+        if len(parts) > 3:
+            # Check that the first char is a dollar sign
+            if parts[1][0] != '$':
+                print(f"Invalid variable definition in line '{line.strip()}': Missing '$'")
+                return
+            # Check if it is String, int, or boolean
+            if parts[3].isdigit():
+                variables.update({parts[1]: int(parts[3])})
+            elif parts[3].upper() == 'TRUE':
+                variables.update({parts[1]: True})
+            elif parts[3].upper() == 'FALSE':
+                variables.update({parts[1]: False})
+            else:
+                # Check if it needs calculations
+                if parts[3][0] == '(':
+                    # Get the location of the first parentheses
+                    start = line.find('(')
+
+                    expression = replacer(line[start:])
+                    
+                    # Evaluate the expression
+                    try: 
+                        variables.update({parts[1]: eval(expression)}) # Evaluate the expression and update the variable
+                    except Exception as e:
+                        variables.update({parts[1]: line.lstrip()[(7 + len(parts[1])):]}) # Account for the length of the variable name, the 3 spaces and the equal sign
+                else:
+                    variables.update({parts[1]: line.lstrip()[(7 + len(parts[1])):]}) # Account for the length of the variable name, the 3 spaces and the equal sign
+        return
+    elif command[0] == '$':
+        if len(parts) > 2:
+
+            # Check if it is String, int, or boolean
+            if parts[2].isdigit():
+                variables.update({parts[0]: int(parts[1])})
+            elif parts[2].upper() == 'TRUE':
+                variables.update({parts[0]: True})
+            elif parts[2].upper() == 'FALSE':
+                variables.update({parts[0]: False})
+            else:
+                # Check if it needs calculations
+                if parts[2][0] == '(':
+                    # Get the location of the first parentheses
+                    start = line.find('(')
+
+                    expression = replacer(line[start:])
+                    print(expression)
+                    
+                    # Evaluate the expression
+                    try: 
+                        variables.update({parts[0]: eval(expression)}) # Evaluate the expression and update the variable
+                    except Exception as e:
+                        variables.update({parts[0]: line.lstrip()[(3 + len(parts[0])):]}) # Account for the length of the variable name, the 2 spaces and the equal sign
+                else:
+                    variables.update({parts[0]: line.lstrip()[(3 + len(parts[0])):]}) # Account for the length of the variable name, the 2 spaces and the equal sign
+        return
+
+    newline = replacer(line)
+    parts = newline.strip().split()
+    if command == 'STRING':
+        if len(parts) > 1:
+            # Send a string
+            send_string(newline.lstrip().rstrip('\n')[7:])
+        else:
+            string_block = True
+    elif command == 'STRINGLN':
+        if len(parts) > 1:
+            # Send a string followed by a newline
+            send_string(newline.lstrip().rstrip('\n')[9:] + '\n')
+        else:
+            stringln_block = True
+    elif command in SPECIAL_KEYS:
+        # Handle special keys
+        keyboard.send_keys([SPECIAL_KEYS[command]])
+        time.sleep(keypress_delay)
+        keyboard.send_keys([])  # Release key
+    elif command == 'DELAY' and len(parts) > 1:
+        # Delay for a specified time in milliseconds
+        delay_time = int(parts[1]) / 1000.0
+        time.sleep(delay_time)
+    elif command in MODIFIER_KEYS:
+        # Handle multiple modifier keys with a final key (ex. "CTRL ALT DELETE")
+        modifiers = []
+        keycode = None
+
+        # Collect all modifiers and final key from the command
+        for part in parts:
+            part_upper = part.upper()
+            if part_upper in MODIFIER_KEYS:
+                modifiers.append(MODIFIER_KEYS[part_upper])
+            elif part_upper in SPECIAL_KEYS:
+                keycode = SPECIAL_KEYS[part_upper]
+            elif part.lower() in CHARACTER_TO_KEYCODE:
+                keycode = CHARACTER_TO_KEYCODE[part.lower()]
+            elif part in SHIFT_REQUIRED_CHARACTERS:
+                modifiers.append(MODIFIER_KEYS['SHIFT'])
+                keycode = SHIFT_REQUIRED_CHARACTERS[part]
+
+        # If we have modifiers and a keycode, send them together
+        if modifiers and keycode:
+            keyboard.send_keys(modifiers + [keycode])
+            time.sleep(keypress_delay)
+            keyboard.send_keys([])  # Release keys
+        elif modifiers:
+            # If only modifiers were specified, press and release them alone
+            keyboard.send_keys(modifiers)
+            time.sleep(keypress_delay)
+            keyboard.send_keys([])  # Release keys
+        else:
+            print(f"No key specified for modifiers in command '{line.strip()}'")
+    else:
+        print(f"Command '{command}' not recognized or not implemented.")
