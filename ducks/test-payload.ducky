@@ -1,3 +1,5 @@
+$_JITTER_ENABLED = TRUE
+$_JITTER_MAX = 50
 DEFINE #testconst somethinghere
 VAR $testvar = 123
 REM This is a test script!
@@ -34,10 +36,38 @@ ENTER
 $testvar = ($testvar-3)
 STRINGLN This is the new test variable:$testvar
 STRINGLN Testing loops
-VAR $loop = 1
-WHILE ( $loop < 5 )
-	STRINGLN $loop
-	$loop = ( $loop + 1 )
+REM Three Nested Loops
+VAR $i = 1
+WHILE ( $i <= 2 )
+    STRING Outer loop iteration: $i
+    ENTER
+    VAR $j = 1
+    WHILE ( $j <= 2 )
+        STRING   Middle loop iteration: $j
+        ENTER
+        VAR $k = 1
+        WHILE ( $k <= 2 )
+            STRING     Inner loop iteration: $k
+            ENTER
+            $k = ( $k + 1 )
+        END_WHILE
+        $j = ( $j + 1 )
+    END_WHILE
+    $i = ( $i + 1 )
+END_WHILE
+REM First Independent Loop
+VAR $a = 1
+WHILE ( $a <= 3 )
+    STRING Independent loop A, iteration: $a
+    ENTER
+    $a = ( $a + 1 )
+END_WHILE
+REM Second Independent Loop
+VAR $b = 1
+WHILE ( $b <= 3 )
+    STRING Independent loop B, iteration: $b
+    ENTER
+    $b = ( $b + 1 )
 END_WHILE
 GUI r
 DELAY 100

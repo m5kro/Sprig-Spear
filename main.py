@@ -9,6 +9,7 @@ import os
 import captivewifi
 import beaconspam
 import blescan
+import gc
 
 # Color Definitions
 BLACK = ST7735.BLACK
@@ -124,8 +125,6 @@ def display_boot_img(img_width=160, img_height=128):
     
     fb.fill(BLACK)  # Fill background with black
     ST7735.update_display(fb)  # Update the display
-
-    #fb.fill(BLACK)  # Fill background with black
 
     # Calculate the scaling factor
     scale_factor = height / img_height
@@ -456,7 +455,9 @@ def check_buttons():
             enter_menu(rubber_ducky_submenu)
         elif current_menu == rubber_ducky_submenu:
             selected_script = rubber_ducky_submenu[selected_index] + ".ducky"  # Get the full filename
+            gc.collect()  # Needed incase of big scripts with multiple nested loops
             interpret_ducky_script(selected_script)  # Execute the script
+            gc.collect()  # Clean up memory after script execution
         button_pressed = True
         time.sleep(0.2)  # Debounce delay
     elif any(not btn.value() for btn in button_left) and previous_menu_stack:
@@ -473,13 +474,16 @@ def start_menu():
     load_ducky_scripts()  # Load .ducky files at startup
     load_captive_portal_folders()  # Load captive portal folders at startup
     load_beacon_names()  # Load beacon names at startup
+    gc.collect()  # Run garbage collector to free up memory
     while True:
         check_buttons()
         display_menu(current_menu)
         time.sleep(0.05)  # Short delay to control button check speed
+        gc.collect()  # Run garbage collector to free up memory
 
 # Initialize and display
 ST7735.init_display()
 ST7735.mount_sd()
 display_boot_img()
+gc.collect()  # Run garbage collector to free up memory
 start_menu()
