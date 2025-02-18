@@ -35,6 +35,17 @@ STRINGLN constants should not have an equal sign
 ENTER
 $testvar = ($testvar-3)
 STRINGLN This is the new test variable:$testvar
+STRINGLN Testing functions!
+FUNCTION test()
+    STRINGLN Working!
+    RETURN $testvar
+END_FUNCTION
+STRINGLN Calling function: test()
+STRINGLN Testing key holding
+HOLD a
+STRING If you can read this it isn't working
+RELEASE a
+ENTER
 STRINGLN Testing loops
 REM Three Nested Loops
 VAR $i = 1

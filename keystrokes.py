@@ -1,8 +1,7 @@
+# I got a stroke writing this
+
 # TODO:
-# - Add support for functions
-# - Add support for returning values from functions
 # - Add support for if-else statements
-# - Add support for holding down keys
 # - Add support for random values
 # - (maybe) Add support for mouse movements and clicks
 
@@ -10,6 +9,7 @@ import usb.device
 from usb.device.keyboard import KeyboardInterface, KeyCode
 import time
 import random
+from machine import Pin, soft_reset
 
 # Dummy keyboard class for testing purposes
 """
@@ -38,7 +38,11 @@ string_block = False  # Flag for STRING BLOCK sections
 stringln_block = False  # Flag for STRINGLN BLOCK sections
 constants = {}  # Dictionary to store constants
 variables = {}  # Dictionary to store variables
+functions = {}  # Dictionary to store functions
+held_keys = []  # List to store currently held keys
 reading_while = False  # Flag to indicate if we are reading a while loop
+reading_function = False  # Flag to indicate if we are reading a function
+current_function = ""  # String to store the current function name
 num_whiles = 0  # Number of while loops
 while_condition = ""  # String to store the while condition
 while_block = ""  # String to store the while block
@@ -46,6 +50,9 @@ jitter = False  # Flag to indicate if we should add jitter
 max_jitter = 20  # Maximum jitter in milliseconds to add to the keypress delay
 
 keypress_delay = 0.0  # Delay in seconds between keypresses, supports decimal values
+
+# Define the button to stop
+button_left = [Pin(13, Pin.IN, Pin.PULL_UP), Pin(6, Pin.IN, Pin.PULL_UP)]
 
 # Modifier keys dictionary
 MODIFIER_KEYS = {
@@ -125,6 +132,12 @@ SHIFT_REQUIRED_CHARACTERS = {
 
 def send_string(text):
     global jitter, max_jitter, keypress_delay
+
+    # Quit if left button held down
+    if button_left[0].value() == 0 or button_left[1].value() == 0:
+        print("Stopping execution...")
+        soft_reset()
+
     # Send a string character by character
     for char in text:
         if char.islower() or char.isdigit() or char in CHARACTER_TO_KEYCODE:
@@ -135,6 +148,7 @@ def send_string(text):
                 time.sleep(random.randint(0, max_jitter) / 1000.0)
             time.sleep(keypress_delay)
             keyboard.send_keys([])  # Release the key
+            keyboard.send_keys(held_keys) # Keep held keys held
         elif char.isupper():
             # Send uppercase letters with Shift
             keycode = CHARACTER_TO_KEYCODE[char.lower()]
@@ -143,6 +157,7 @@ def send_string(text):
                 time.sleep(random.randint(0, max_jitter) / 1000.0)
             time.sleep(keypress_delay)
             keyboard.send_keys([])  # Release keys
+            keyboard.send_keys(held_keys) # Keep held keys held
         elif char in SHIFT_REQUIRED_CHARACTERS:
             # Send special characters with Shift
             keycode = SHIFT_REQUIRED_CHARACTERS[char]
@@ -151,6 +166,7 @@ def send_string(text):
                 time.sleep(random.randint(0, max_jitter) / 1000.0)
             time.sleep(keypress_delay)
             keyboard.send_keys([])  # Release keys
+            keyboard.send_keys(held_keys) # Keep held keys held
         else:
             print(f"Character '{char}' not found in keycode mapping.")
 
@@ -161,6 +177,15 @@ def replacer(input):
         input = input.replace(key, str(constants[key]))
     for key in sorted(variables.keys(), key=len, reverse=True):
         input = input.replace(key, str(variables[key]))
+    for key in sorted(functions.keys(), key=len, reverse=True):
+        if key in input:
+            output = ""
+            for line in functions[key].split('\n'):
+                print(line)
+                temp = interpret_line(line.lstrip())
+                if temp != None:
+                    output += str(temp)
+            input = input.replace(key, output)
     return input
 
 def interpret_ducky_script(filename):
@@ -181,7 +206,7 @@ def handle_while_loop(condition, block):
             interpret_line(line.lstrip())
 
 def interpret_line(line):
-    global rem_block, string_block, stringln_block, constants, variables, num_whiles, reading_while, while_condition, while_block, jitter, max_jitter, keypress_delay
+    global rem_block, string_block, stringln_block, constants, variables, num_whiles, reading_while, while_condition, while_block, jitter, max_jitter, keypress_delay, reading_function, current_function, functions
     # Split the line into parts
     print(line)
     parts = line.strip().split()
@@ -239,7 +264,39 @@ def interpret_line(line):
         while_condition = line.lstrip()[6:].strip()
         while_block = ""  # Start with an empty block
         return
+    
+    # Handle Functions
+    if reading_function:
+        if command == 'END_FUNCTION':
+            reading_function = False
+            return
+        # Append every line to the function_block.
+        functions.update({current_function: functions[current_function] + line + "\n"})  # adding a newline for proper splitting later
+        return
 
+    if command == 'FUNCTION':
+        reading_function = True
+        current_function = line.lstrip()[9:].strip()
+        functions.update({current_function: ""})
+        return
+
+    if command[-1] == ')' and command[-2] == '(':
+        # Call a function
+        if command in functions:
+            for line in functions[command].split('\n'):
+                interpret_line(line.lstrip())
+        else:
+            print(f"Function '{command}' not found.")
+        return
+    
+    if command == 'RETURN':
+        output = ""
+        try:
+            output = eval(replacer(line.lstrip()[7:]))
+        except Exception as e:
+            output = replacer(line.lstrip()[7:])
+        return output
+    
     if command == 'DEFINE':
         # Define a constant
         if len(parts) > 2:
@@ -354,6 +411,34 @@ def interpret_line(line):
             send_string(newline.lstrip().rstrip('\n')[9:] + '\n')
         else:
             stringln_block = True
+    elif command == 'HOLD':
+        # Hold down a key
+        if len(parts) > 1:
+            key = parts[1].upper()
+            if key in MODIFIER_KEYS and MODIFIER_KEYS[key] not in held_keys:
+                held_keys.append(MODIFIER_KEYS[key])
+            elif key in SPECIAL_KEYS and SPECIAL_KEYS[key] not in held_keys:
+                held_keys.append(SPECIAL_KEYS[key])
+            elif key.lower() in CHARACTER_TO_KEYCODE and CHARACTER_TO_KEYCODE[key.lower()] not in held_keys:
+                held_keys.append(CHARACTER_TO_KEYCODE[key.lower()])
+            else:
+                print(f"Key '{key}' not recognized or already held.")
+        keyboard.send_keys([])
+        keyboard.send_keys(held_keys)
+    elif command == 'RELEASE':
+        # Release a key
+        if len(parts) > 1:
+            key = parts[1].upper()
+            if key in MODIFIER_KEYS and MODIFIER_KEYS[key] in held_keys:
+                held_keys.remove(MODIFIER_KEYS[key])
+            elif key in SPECIAL_KEYS and SPECIAL_KEYS[key] in held_keys:
+                held_keys.remove(SPECIAL_KEYS[key])
+            elif key.lower() in CHARACTER_TO_KEYCODE and CHARACTER_TO_KEYCODE[key.lower()] in held_keys:
+                held_keys.remove(CHARACTER_TO_KEYCODE[key.lower()])
+            else:
+                print(f"Key '{key}' not recognized or not held.")
+        keyboard.send_keys([])
+        keyboard.send_keys(held_keys)
     elif command in SPECIAL_KEYS:
         # Handle special keys
         keyboard.send_keys([SPECIAL_KEYS[command]])
@@ -361,6 +446,7 @@ def interpret_line(line):
                 time.sleep(random.randint(0, max_jitter) / 1000.0)
         time.sleep(keypress_delay)
         keyboard.send_keys([])  # Release key
+        keyboard.send_keys(held_keys) # Keep held keys held
     elif command == 'DELAY' and len(parts) > 1:
         # Delay for a specified time in milliseconds
         delay_time = int(parts[1]) / 1000.0
@@ -390,6 +476,7 @@ def interpret_line(line):
                 time.sleep(random.randint(0, max_jitter) / 1000.0)
             time.sleep(keypress_delay)
             keyboard.send_keys([])  # Release keys
+            keyboard.send_keys(held_keys) # Keep held keys held
         elif modifiers:
             # If only modifiers were specified, press and release them alone
             keyboard.send_keys(modifiers)
@@ -397,6 +484,7 @@ def interpret_line(line):
                 time.sleep(random.randint(0, max_jitter) / 1000.0)
             time.sleep(keypress_delay)
             keyboard.send_keys([])  # Release keys
+            keyboard.send_keys(held_keys) # Keep held keys held
         else:
             print(f"No key specified for modifiers in command '{line.strip()}'")
     else:

@@ -455,9 +455,11 @@ def check_buttons():
             enter_menu(rubber_ducky_submenu)
         elif current_menu == rubber_ducky_submenu:
             selected_script = rubber_ducky_submenu[selected_index] + ".ducky"  # Get the full filename
+            pwm_status_light.duty_u16(65535 // 8)  # Keep status light on during script execution
             gc.collect()  # Needed incase of big scripts with multiple nested loops
             interpret_ducky_script(selected_script)  # Execute the script
             gc.collect()  # Clean up memory after script execution
+            pwm_status_light.duty_u16(0)  # Turn off the status light when script stops
         button_pressed = True
         time.sleep(0.2)  # Debounce delay
     elif any(not btn.value() for btn in button_left) and previous_menu_stack:
