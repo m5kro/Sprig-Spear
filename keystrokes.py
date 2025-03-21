@@ -1,9 +1,12 @@
-# I got a stroke writing this
+# m5kro - 2025
+# A jank implementation of a DuckyScript 3.0 interpreter
+# The code is quacking at me ... Please send help ╥﹏╥
 
 # TODO:
-# - Add support for if-else statements
 # - Add support for random values
-# - (maybe) Add support for mouse movements and clicks
+# - Add support for mouse movements and clicks
+# - Add support for WAIT_FOR command (maybe)
+# - Figure out a way to get the capslock, numlock, and fnlock status
 
 import usb.device
 from usb.device.keyboard import KeyboardInterface, KeyCode
@@ -40,6 +43,11 @@ constants = {}  # Dictionary to store constants
 variables = {}  # Dictionary to store variables
 functions = {}  # Dictionary to store functions
 held_keys = []  # List to store currently held keys
+if_else_conditions = []  # List to store if-else conditions
+if_else_blocks = []  # List to store if-else blocks
+current_if_else = 0  # Index of the current if-else block
+num_if_else = 0  # Number of if-else blocks
+reading_if_else = False  # Flag to indicate if we are reading an if-else block
 reading_while = False  # Flag to indicate if we are reading a while loop
 reading_function = False  # Flag to indicate if we are reading a function
 current_function = ""  # String to store the current function name
@@ -205,8 +213,20 @@ def handle_while_loop(condition, block):
         for line in block.split('\n'):
             interpret_line(line.lstrip())
 
+def handle_if_else(conditions, blocks):
+    # Handle If-Else block execution
+    global if_else_conditions, if_else_blocks, current_if_else
+    if_else_conditions = []
+    if_else_blocks = []
+    current_if_else = 0
+    for i, condition in enumerate(conditions):
+        if eval(replacer(condition)):
+            for line in blocks[i].split('\n'):
+                interpret_line(line)
+            return
+
 def interpret_line(line):
-    global rem_block, string_block, stringln_block, constants, variables, num_whiles, reading_while, while_condition, while_block, jitter, max_jitter, keypress_delay, reading_function, current_function, functions
+    global rem_block, string_block, stringln_block, constants, variables, num_whiles, num_if_else, reading_while, if_else_conditions, if_else_blocks, current_if_else, reading_if_else, while_condition, while_block, jitter, max_jitter, keypress_delay, reading_function, current_function, functions
     # Split the line into parts
     print(line)
     parts = line.strip().split()
@@ -244,9 +264,11 @@ def interpret_line(line):
     # Ignore lines that start with 'REM' as comments
     if command == 'REM':
         return
+
+    # While loops, If-Else blocks, and function blocks are handled separately but also need to keep in mind the current state of the other
     
     # Handle While loop
-    if reading_while:
+    if reading_while and not reading_if_else and not reading_function:
         # Append every line to the while_block.
         while_block += line + "\n"  # adding a newline for proper splitting later
         if command == 'WHILE':
@@ -258,15 +280,65 @@ def interpret_line(line):
                 handle_while_loop(while_condition, while_block)
         return
     
-    if command == 'WHILE':
+    if command == 'WHILE' and not reading_if_else and not reading_function:
         reading_while = True
         num_whiles = 1
         while_condition = line.lstrip()[6:].strip()
         while_block = ""  # Start with an empty block
         return
+
+    # Handle If-Else blocks
+    if command == 'IF' and not reading_while and not reading_function:
+        if reading_if_else:
+            num_if_else += 1
+        else:
+            if line.rstrip().endswith('THEN'):
+                reading_if_else = True
+                if_else_conditions.append(line.strip()[3:-4].strip())
+                if_else_blocks.append("")
+                return
+            else:
+                print(f"Invalid IF statement in line '{line.strip()}': Missing 'THEN'")
+                return
+    
+    if command == 'ELSE' and not reading_while and not reading_function:
+        if reading_if_else and num_if_else == 0:
+            if parts[1] == 'IF':
+                if line.rstrip().endswith('THEN'):
+                    if_else_conditions.append(line.strip()[8:-4].strip())
+                    if_else_blocks.append("")
+                    current_if_else += 1
+                    return
+                else:
+                    print(f"Invalid ELSE statement in line '{line.strip()}': Missing 'THEN'")
+                    return
+            else:
+                if_else_conditions.append("True")
+                if_else_blocks.append("")
+                current_if_else += 1
+                return
+        else:
+            print(f"Invalid ELSE statement in line '{line.strip()}': Missing 'IF'")
+            return
+    
+    if command == 'END_IF' and not reading_while and not reading_function:
+        if reading_if_else:
+            if num_if_else > 0:
+                num_if_else -= 1
+            else:
+                reading_if_else = False
+                handle_if_else(if_else_conditions, if_else_blocks)
+                return
+        else:
+            print(f"Invalid END_IF statement in line '{line.strip()}': Missing 'IF'")
+            return
+    
+    if reading_if_else and not reading_while and not reading_function:
+        if_else_blocks[current_if_else] += line + "\n"
+        return
     
     # Handle Functions
-    if reading_function:
+    if reading_function and not reading_while and not reading_if_else:
         if command == 'END_FUNCTION':
             reading_function = False
             return
@@ -274,7 +346,7 @@ def interpret_line(line):
         functions.update({current_function: functions[current_function] + line + "\n"})  # adding a newline for proper splitting later
         return
 
-    if command == 'FUNCTION':
+    if command == 'FUNCTION' and not reading_while and not reading_if_else:
         reading_function = True
         current_function = line.lstrip()[9:].strip()
         functions.update({current_function: ""})
@@ -411,6 +483,9 @@ def interpret_line(line):
             send_string(newline.lstrip().rstrip('\n')[9:] + '\n')
         else:
             stringln_block = True
+    elif command == 'STOP_PAYLOAD':
+        print("Stop order received.")
+        exit()
     elif command == 'HOLD':
         # Hold down a key
         if len(parts) > 1:
